@@ -10,15 +10,19 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.*;
+import javax.xml.xpath.XPathExpressionException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
- * Created by tropper on 19/03/16.
+ * Default implementation.
+ *
+ * @author skerkewitz, 2016-03-20
  */
 @Service
 public class ReviewServiceImpl implements ReviewService {
@@ -26,49 +30,53 @@ public class ReviewServiceImpl implements ReviewService {
     private static final Log logger = LogFactory.getLog(ReviewServiceImpl.class);
 
     @Override
-    public List<ReviewEntry> fetchEntries(int appId) throws IOException, XPathExpressionException, SAXException, ParserConfigurationException {
+    public List<ReviewEntry> fetchEntries(int appId) {
         /* Fetch the entries for each country and merge the result into one list. */
         List<ReviewEntry> resultList = new ArrayList<>();
         for (AppStoreCC appStoreCC : AppStoreCC.values()) {
-            resultList.addAll(fetchEntriesInCountry(appId, appStoreCC));
+            try {
+                resultList.addAll(fetchEntriesInCountry(appId, appStoreCC));
+            } catch (IOException | SAXException | ParserConfigurationException | XPathExpressionException e) {
+                logger.error("Could not parse list for " + appStoreCC + " because of: " + e, e);
+            }
         }
 
+        /* Sort the list by date. */
+        Collections.sort(resultList, (o1, o2) -> o1.date.compareTo(o2.date));
         return resultList;
     }
 
-    public List<ReviewEntry> fetchEntriesInCountry(int appId, AppStoreCC appStoreCC) throws IOException, XPathExpressionException, SAXException, ParserConfigurationException {
-        return fetchDocument(appId, appStoreCC);
-    }
+    private List<ReviewEntry> fetchEntriesInCountry(int appId, AppStoreCC appStoreCC) throws IOException, XPathExpressionException, SAXException, ParserConfigurationException {
 
-    private URL buildUrl(int appId, AppStoreCC appStoreCC) throws MalformedURLException {
-        return new URL("https://itunes.apple.com/" + appStoreCC.getCC() + "/rss/customerreviews/id=" + appId + "/sortBy=mostRecent/xml?l=en");
-    }
-
-    private List<ReviewEntry> fetchDocument(int appId, AppStoreCC appStoreCC) throws IOException, ParserConfigurationException, SAXException, XPathExpressionException {
-        final URL url = buildUrl(appId, appStoreCC);
-
-        final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        final DocumentBuilder builder = factory.newDocumentBuilder();
-        final Document doc = builder.parse(url.openStream());
-
-        final XPathFactory xPathfactory = XPathFactory.newInstance();
-        final XPathExpression exprEntries = xPathfactory.newXPath().compile("//entry");
-        final NodeList nl = (NodeList) exprEntries.evaluate(doc, XPathConstants.NODESET);
-
+        final Document doc = fetchDocument(appId, appStoreCC);
         final EntryParser parser = new EntryParser();
+        final NodeList nodeList = parser.parseEntries(doc);
 
-        logger.info("Found " + nl.getLength() + " entries for app " + appId + " in " + appStoreCC);
-        final List<ReviewEntry> resultList = new ArrayList<>(nl.getLength());
-        for (int i = 1; i < nl.getLength(); i++) {
-
+        logger.info("Found " + nodeList.getLength() + " entries for app " + appId + " in " + appStoreCC);
+        final List<ReviewEntry> resultList = new ArrayList<>(nodeList.getLength());
+        /* Skip first element as it is not a user review.*/
+        for (int i = 1; i < nodeList.getLength(); i++) {
             try {
-                resultList.add(parser.parseEntry(nl.item(i), appStoreCC));
-            } catch (XPathExpressionException e) {
+                resultList.add(parser.parseEntry(nodeList.item(i), appStoreCC));
+            } catch (ParseException | XPathExpressionException e) {
                 logger.error("Could not parse element at index " + i + " because of: " + e, e);
-                e.printStackTrace();
             }
         }
 
         return resultList;
     }
+
+    private Document fetchDocument(int appId, AppStoreCC appStoreCC) throws ParserConfigurationException, SAXException, IOException {
+        final URL url = buildUrl(appId, appStoreCC);
+
+        final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        final DocumentBuilder builder = factory.newDocumentBuilder();
+        return builder.parse(url.openStream());
+    }
+
+    private URL buildUrl(int appId, AppStoreCC appStoreCC) throws MalformedURLException {
+        return new URL("https://itunes.apple.com/" + appStoreCC.getCC()
+                + "/rss/customerreviews/id=" + appId + "/sortBy=mostRecent/xml?l=en");
+    }
+
 }
