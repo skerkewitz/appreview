@@ -10,7 +10,6 @@ Clone, build and run the application:
 ```
 git clone https://github.com/skerkewitz/appreview.git
 cd appreview
-git checkout develop
 gradle bootRun -Pargs="--appStoreAppId=$YOUR_APP_ID$"
 ```
 
