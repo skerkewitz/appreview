@@ -13,4 +13,6 @@ import java.util.List;
 public interface ReviewService {
 
     List<ReviewEntry> fetchEntries(int appId) throws IOException, XPathExpressionException, SAXException, ParserConfigurationException;
+
+    List<ReviewEntry> fetchNewEntries(int appId);
 }

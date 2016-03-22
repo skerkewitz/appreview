@@ -39,7 +39,7 @@ public class EntryParser {
         exprText = xPathfactory.newXPath().compile("./content[@type='text']");
     }
 
-    public ReviewEntry parseEntry(Node node, AppStoreCC appStoreCC) throws XPathExpressionException, ParseException {
+    public ReviewEntry parseEntry(Node node, int appStoreId, AppStoreCC appStoreCC) throws XPathExpressionException, ParseException {
 
         final Double id = (Double) exprId.evaluate(node, XPathConstants.NUMBER);
         final String date = (String) exprDate.evaluate(node, XPathConstants.STRING);
@@ -50,7 +50,7 @@ public class EntryParser {
         final String text = (String) exprText.evaluate(node, XPathConstants.STRING);
 
         final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
-        return new ReviewEntry(id.intValue(), appStoreCC, sdf.parse(date), name, rating.intValue(), version, title, text);
+        return new ReviewEntry(appStoreId, id.intValue(), appStoreCC, sdf.parse(date), name, rating.intValue(), version, title, text);
     }
 
     public NodeList parseEntries(Object doc) throws XPathExpressionException {
