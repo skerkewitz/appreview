@@ -3,7 +3,7 @@ Spring boot test and proof of concept application.
 
 ## Requirements
 * Java JDK8
-* Gradle
+* Gradle 3.0
 
 ## Usage
 Clone, build and run the application:
